@@ -1,0 +1,30 @@
+[project]
+name = "rag-vector-search-assessment"
+version = "0.1.0"
+description = "Local RAG retrieval assessment: semantic search vs query-expanded retrieval"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "sentence-transformers>=2.7.0",
+  "numpy>=1.26.0",
+  "pydantic>=2.0.0",
+  "rich>=13.0.0",
+  "chromadb>=0.5.0",
+  "faiss-cpu>=1.8.0",
+  "pyyaml>=6.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "pytest-mock>=3.12.0",
+]
+openai = ["openai>=1.0.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

@@ -1,0 +1,46 @@
+[
+  {
+    "section": "Peak load and autoscaling",
+    "text": "During peak load the API tier scales horizontally using Kubernetes HPA targets based on CPU and custom request-queue depth signals. New pods join the service mesh within seconds; connection draining ensures in-flight work completes before scale-down. Latency SLOs are protected by admission control when queues grow faster than autoscaling can absorb."
+  },
+  {
+    "section": "Cache architecture",
+    "text": "The edge cache uses a two-tier design: an in-memory LRU for hot keys and a regional Redis cluster for shared objects. TTLs are staggered to prevent thundering herds when popular keys expire at the same instant."
+  },
+  {
+    "section": "Cache failure modes",
+    "text": "When the primary Redis tier becomes unhealthy the application degrades gracefully by bypassing cache reads and writes, falling back to authoritative database queries while emitting elevated latency alerts to SRE dashboards."
+  },
+  {
+    "section": "Database read scaling",
+    "text": "Read replicas serve analytical queries and offload the primary writer. Replica lag is monitored continuously; queries that require strongly consistent reads are pinned to the primary connection pool. Transactions on the writer enforce serializable isolation for financial adjustments."
+  },
+  {
+    "section": "Cross-region consistency",
+    "text": "Cross-region writes flow through a conflict-free replicated data type for inventory counters while user profile updates use last-write-wins with vector clocks to survive partial network partitions between regions."
+  },
+  {
+    "section": "Stream processing",
+    "text": "Event ingestion pipelines batch acknowledgements and apply backpressure when downstream sinks lag. Poison messages are quarantined after configurable retry budgets to protect overall throughput. Consumer offsets are checkpointed so retries remain idempotent when the same event is redelivered."
+  },
+  {
+    "section": "Security boundaries",
+    "text": "Tenant isolation enforces row-level security at the database layer and mutual TLS between microservices. Secrets never appear in logs—only opaque identifiers are printed for correlation."
+  },
+  {
+    "section": "Observability",
+    "text": "Distributed traces stitch HTTP spans with queue consumers and database calls. SLO burn alerts trigger paging when error budgets drain faster than the weekly rolling window allows."
+  },
+  {
+    "section": "Downstream resilience",
+    "text": "When downstream services are unavailable the edge gateway sheds optional traffic, applies circuit breakers per dependency, and uses exponential backoff retries only for idempotent verbs. Timeouts are budgeted end-to-end so threads are not pinned waiting on dead peers."
+  },
+  {
+    "section": "Infrastructure recovery",
+    "text": "The platform recovers from infrastructure failure by promoting warm replicas in a secondary region, replaying durable logs, and automating runbooks that validate data checksums before shifting user traffic back to the healed cell."
+  },
+  {
+    "section": "Idempotency and deduplication",
+    "text": "Repeated processing of the same request is prevented by idempotency keys stored in a short-lived deduplication table; clients replaying a submission receive the original response without double-charging inventory or re-emitting side effects."
+  }
+]

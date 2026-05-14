@@ -1,0 +1,164 @@
+# =============================================================================
+# Context-Aware Retrieval Engine — single source of truth (see plan.md)
+# =============================================================================
+# All behavior is driven from this file. Prefer: FAISS + HNSW + cosine +
+# recursive token chunking + mock Vertex query expansion for the assessment.
+# =============================================================================
+
+project:
+  # Human-readable project label for logs and reports.
+  name: context-aware-retrieval-engine
+  # "local" keeps mocks and on-disk stores; change only when wiring cloud.
+  environment: local
+  # Fixed seed for any stochastic components (e.g. IVF subsampling).
+  random_seed: 42
+
+# -----------------------------------------------------------------------------
+# Data
+# -----------------------------------------------------------------------------
+# input_path: JSON list of objects. Each object must contain text_field.
+# id_field: optional stable id; if missing, doc_000 style ids are generated.
+data:
+  input_path: data/technical_paragraphs.json
+  text_field: text
+  id_field: id
+
+# -----------------------------------------------------------------------------
+# Chunking (plan §8 chunking)
+# -----------------------------------------------------------------------------
+# algorithm options:
+#   recursive      — BEST DEFAULT: separator cascade + token budget (plan §8).
+#   fixed_character — quick baseline; weak on structure boundaries.
+#   fixed_token     — strict token windows; needs sentence_transformers tokenizer.
+#   sentence        — good for clean prose; weak on bullet lists / code.
+#   semantic        — paragraph merge by token budget (lightweight proxy).
+chunking:
+  algorithm: recursive
+
+  recursive:
+    # ~350 tokens is a strong default for MiniLM-class models (plan §8).
+    chunk_size_tokens: 350
+    chunk_overlap_tokens: 60
+    separators:
+      - "\n\n"
+      - "\n"
+      - ". "
+      - " "
+    keep_separator: true
+
+  fixed_character:
+    chunk_size_chars: 1200
+    chunk_overlap_chars: 150
+
+  fixed_token:
+    chunk_size_tokens: 350
+    chunk_overlap_tokens: 60
+
+  sentence:
+    max_sentences_per_chunk: 6
+    overlap_sentences: 1
+
+  semantic:
+    enabled: false
+    breakpoint_threshold: 0.78
+    min_chunk_tokens: 120
+    max_chunk_tokens: 500
+
+# -----------------------------------------------------------------------------
+# Embeddings (plan §8 embedding)
+# -----------------------------------------------------------------------------
+# provider:
+#   sentence_transformers — BEST for real semantic quality (local).
+#   mock_vertex           — deterministic tiny vectors; BEST for fast CI.
+embedding:
+  provider: sentence_transformers
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  batch_size: 32
+  # true = L2-normalize; REQUIRED for cosine / inner_product with FAISS IP.
+  normalize_embeddings: true
+
+  mock_vertex:
+    dimensions: 384
+
+# -----------------------------------------------------------------------------
+# Similarity (plan §11)
+# -----------------------------------------------------------------------------
+# metric:
+#   cosine         — BEST DEFAULT for text RAG (direction > magnitude).
+#   inner_product  — equivalent to cosine when vectors are normalized.
+#   euclidean      — only when your embedding model is trained for L2 geometry.
+similarity:
+  metric: cosine
+
+# -----------------------------------------------------------------------------
+# Vector store (plan §8 vector_store + §10)
+# -----------------------------------------------------------------------------
+# provider:
+#   faiss  — BEST for assessment depth (Flat / HNSW / IVF / PQ).
+#   chroma — BEST for app-style persistence + metadata ergonomics.
+#   numpy  — BEST for exact tiny-corpus debugging.
+vector_store:
+  provider: faiss
+  persist_path: storage/vector_index
+  # Used only when faiss.index_selection_policy == auto (plan §9).
+  ram_budget_gb: 4.0
+
+  chroma:
+    collection_name: assessment_rag
+    persist_directory: storage/chroma
+
+  faiss:
+    # index_type:
+    #   hnsw     — BEST default local RAG (quality vs speed).
+    #   flat     — exact, tiny corpora, debugging.
+    #   ivf_flat — larger corpora; needs enough vectors to train lists.
+    #   ivf_pq   — very large / memory constrained; dim must divide pq code size.
+    #   auto     — picks from corpus size + ram_budget (plan §9).
+    index_type: hnsw
+    # manual = honor index_type; auto = choose_faiss_index policy.
+    index_selection_policy: manual
+    hnsw_m: 32
+    hnsw_ef_construction: 200
+    hnsw_ef_search: 64
+    ivf_nlist: 1024
+    ivf_nprobe: 16
+    ivf_pq_m: 64
+    ivf_training_sample_max: 10000
+
+# -----------------------------------------------------------------------------
+# Retrieval (plan §8 retrieval)
+# -----------------------------------------------------------------------------
+retrieval:
+  # Results returned to caller / benchmark tables.
+  top_k: 3
+  # Over-fetch before any future rerank / fusion (reserved; same as top_k today).
+  fetch_k: 20
+  return_scores: true
+  return_metadata: true
+  # Benchmark narrative when top similarity is very low (design guidance).
+  no_match_cosine_threshold: 0.12
+
+# -----------------------------------------------------------------------------
+# Query expansion — Strategy B (plan §4.3)
+# -----------------------------------------------------------------------------
+query_expansion:
+  # mock_vertex_generative_model = deterministic canned expansions (BEST for CI).
+  provider: mock_vertex_generative_model
+  enabled: true
+  deterministic: true
+  expansion_max_chars: 512
+  prompt_template: |
+    Rewrite the user query into a search-friendly technical query.
+    Include related technical terms, synonyms, and system behavior concepts.
+    User query: {query}
+
+# -----------------------------------------------------------------------------
+# Benchmark output (plan §4.4, §12)
+# -----------------------------------------------------------------------------
+benchmark:
+  output_json: storage/benchmark_results.json
+  output_markdown: retrieval_benchmark.md
+  queries:
+    - "How does the system handle peak load?"
+    - "What happens when downstream services fail?"
+    - "How are user requests protected from unauthorized access?"
