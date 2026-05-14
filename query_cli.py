@@ -341,9 +341,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.single:
             run_one_query(args.single.strip())
         else:
+            _log(run_id, f"ready for queries — artifacts: {run_dir.resolve()}")
             print(
-                f"Corpus ready ({n_chunks} chunks). Enter a query per line; empty line exits.\n"
-                f"Artifacts: {run_dir.resolve()}",
+                f"Corpus ready ({n_chunks} chunks). Enter a query per line; empty line exits.",
                 flush=True,
             )
             while True:

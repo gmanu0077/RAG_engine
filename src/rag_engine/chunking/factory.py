@@ -17,6 +17,12 @@ def _char_token_proxy(text: str) -> int:
     return max(1, len(text) // 4)
 
 
+# Never run the HF tokenizer on an entire book in one call (slow + warnings).
+# Recursive chunking only needs a correct count for moderate-sized strings; above
+# this size we estimate so the first split decisions still see "oversized".
+_ENCODE_SAFE_CHARS = 12_000
+
+
 def create_chunker(
     cfg: EngineConfig,
     *,
@@ -31,6 +37,8 @@ def create_chunker(
     if encode is not None:
 
         def len_tokens(t: str) -> int:
+            if len(t) > _ENCODE_SAFE_CHARS:
+                return _char_token_proxy(t)
             return len(encode(t))
 
     else:
