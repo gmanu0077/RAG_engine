@@ -9,6 +9,14 @@ Local **context-aware retrieval engine**: everything is driven from **`config/co
 
 Benchmarks emit **JSON** (overlap, winner heuristic, per-hit previews) and optional **Markdown** reports.
 
+### Entrypoints (what to run)
+
+| What | Role |
+|------|------|
+| **`src/rag_engine/app.py`** (`RAGEngine`) | **Library** — load config, ingest, `search_raw` / `search_expanded`. Import from tests or scripts; it does not run the multi-step shell pipeline. |
+| **`orchestrator.py`** | **Assessment runner** — pytest, benchmark, smoke, markdown export. Each real run creates **`output/<RUN_ID>/`** with `manifest.json`, `config.snapshot.yaml`, per-step logs/JSON, and **`summary.json`**. |
+| **`query_cli.py`** | **Interactive demo** — ingest one large **`.txt` / `.md`** (or a **Gutenberg** download), then prompt only for **queries**. Same style of artifacts under **`output/<RUN_ID>/`** (plus **`queries.jsonl`**); session index lives under that folder so **`storage/`** is left alone. |
+
 ---
 
 ## Repository layout
@@ -17,7 +25,9 @@ Benchmarks emit **JSON** (overlap, winner heuristic, per-hit previews) and optio
 context.md                         # full architecture + config spec
 config/config.yaml              # tunables (comments describe options + good defaults)
 data/technical_paragraphs.json  # sample JSON list (objects with `text`, optional `id`)
+data/cache/                     # Gutenberg samples for query_cli.py (gitignored)
 storage/                        # default benchmark JSON + vector persistence (gitignored)
+output/                         # per-run artifacts: orchestrator + query_cli (gitignored)
 orchestrator.py                  # CLI: pytest, benchmark, smoke, markdown export
 query_cli.py                     # interactive queries on a real long .txt/.md or Gutenberg sample
 scripts/run_benchmark.py        # ingest + benchmark JSON (+ Rich table on stderr)
@@ -87,25 +97,14 @@ python3 orchestrator.py --write-benchmark-md --output retrieval_benchmark.md
 # Or run steps 3–4 in one go:
 python3 orchestrator.py --steps pytest,benchmark
 
-# Or the default “CI-style” pair (pytest then benchmark):
+# Or the default “CI-style” pair (pytest then benchmark only):
 python3 orchestrator.py --all
+
+# All registered orchestrator steps in one run (pytest + benchmark + smoke + markdown):
+python3 orchestrator.py --steps pytest,benchmark,smoke,write-benchmark-md
 ```
 
-### Interactive retrieval (real embeddings, long document)
-
-Use **`query_cli.py`** when the goal is a **single large plaintext corpus** and you only want to **type queries** after ingest. It uses **`config/config.yaml`** as-is (typically **sentence-transformers** + **FAISS**), keeps indexes under **`output/<RUN_ID>/vector_index/`** (so default **`storage/`** is not overwritten), and records the same style of run artifacts: **`manifest.json`**, **`config.snapshot.yaml`**, **`step_*.json`**, **`queries.jsonl`**, **`summary.json`**.
-
-```bash
-# Download a large public-domain book (cached under data/cache/, gitignored)
-python3 query_cli.py --fetch-sample
-python3 query_cli.py --fetch-sample 2701
-
-# Or index your own UTF-8 file (.txt / .md — whole file = one document)
-python3 query_cli.py --doc ./notes.md
-
-# One-shot (non-interactive)
-python3 query_cli.py --doc README.md --single "What is FAISS?"
-```
+### Orchestrator steps
 
 | Step name | Command | What it does |
 |-----------|---------|----------------|
@@ -114,6 +113,24 @@ python3 query_cli.py --doc README.md --single "What is FAISS?"
 | `pytest` | `python3 orchestrator.py --pytest` | Runs `tests/` (quiet `-q` unless you pass args after `--`). |
 | `benchmark` | `python3 orchestrator.py --benchmark` | Ingest + Strategy A vs B; JSON to **stdout**, logs + optional Rich table to **stderr**. |
 | `write-benchmark-md` | `python3 orchestrator.py --write-benchmark-md --output retrieval_benchmark.md` | Writes markdown to `--output` and JSON to `benchmark.output_json` in config. |
+
+### Interactive retrieval (`query_cli.py`)
+
+Use this when you want a **single large plaintext corpus** (your file or a **Project Gutenberg** mirror) and the shell should only ask for **queries** after ingest. It reads **`config/config.yaml`** (real **sentence-transformers** + **FAISS** by default). Indexes for that session are under **`output/<RUN_ID>/vector_index/`** so the repo default **`storage/`** directory is not overwritten.
+
+**Run artifacts** (same pattern as the orchestrator): **`manifest.json`**, **`config.snapshot.yaml`**, **`step_resolve_corpus.json`**, **`step_engine_init.json`**, **`step_ingest.json`**, **`queries.jsonl`** (one JSON record per query with Strategy A and B hits), **`summary.json`**.
+
+```bash
+# Large public-domain book (cached under data/cache/, gitignored); random ID if omitted
+python3 query_cli.py --fetch-sample
+python3 query_cli.py --fetch-sample 2701
+
+# Your UTF-8 file (.txt / .md — whole file = one document)
+python3 query_cli.py --doc ./notes.md
+
+# Optional: alternate engine YAML, one-shot query (no interactive loop)
+python3 query_cli.py --config config/config.yaml --doc README.md --single "What is FAISS?"
+```
 
 ---
 
@@ -129,9 +146,17 @@ python3 orchestrator.py --smoke
 python3 orchestrator.py --benchmark              # may download MiniLM on first run
 python3 orchestrator.py --benchmark --no-rich    # skip Rich table on stderr
 python3 orchestrator.py --write-benchmark-md --output retrieval_benchmark.md
-python3 orchestrator.py --all                     # pytest then benchmark
-python3 orchestrator.py --steps pytest,benchmark
+python3 orchestrator.py --all                     # pytest then benchmark only
+python3 orchestrator.py --steps pytest,benchmark,smoke,write-benchmark-md
 python3 orchestrator.py --pytest -- -k chroma -x   # extra pytest args after --
+```
+
+### Interactive CLI (`query_cli.py`)
+
+```bash
+python3 query_cli.py --doc PATH              # mutually exclusive with --fetch-sample
+python3 query_cli.py --fetch-sample [ID]     # Gutenberg: 11, 1342, 2701; omit ID for random
+python3 query_cli.py --doc notes.md --config config/config.yaml --single "your question"
 ```
 
 ### Standalone benchmark script
@@ -208,7 +233,7 @@ Edit **`config/config.yaml`**. Inline comments explain each block and point to s
 
 Notable keys:
 
-- **`data.input_path`** — JSON list of records; each must include **`data.text_field`** (default `text`).
+- **`data.input_path`** — JSON list of records for **`RAGEngine.ingest()`** / orchestrator benchmark; each record must include **`data.text_field`** (default `text`). **`query_cli.py`** does not use this path; it loads a **plaintext** file via **`load_documents_plaintext()`** or a cached Gutenberg file.
 - **`vector_store.provider`** — `faiss` | `chroma` | `numpy`.
 - **`vector_store.faiss`** — `index_type` (`flat`, `hnsw`, `ivf_flat`, `ivf_pq`, `auto`) and `index_selection_policy` (`manual` | `auto`); see `context.md` §9.
 - **`retrieval.top_k` / `retrieval.fetch_k`** — over-fetch then trim to `top_k`.
@@ -230,6 +255,15 @@ hits = engine.search_raw("How does the system handle peak load?")
 print(n, [h.chunk_id for h in hits])
 ```
 
+Ingest a plaintext file (one document) without temp JSON:
+
+```python
+from rag_engine.documents.loader import load_documents_plaintext
+
+docs = load_documents_plaintext("notes.md")
+n = engine.ingest_documents(docs)
+```
+
 For fast local experiments without downloading models, set in YAML (or mutate the loaded config before constructing `RAGEngine`):
 
 - `embedding.provider: mock_vertex`
@@ -247,8 +281,24 @@ For **`similarity.metric`** `cosine` or `inner_product`, embeddings used with FA
 
 ## Outputs
 
+### Repo-root files (config defaults)
+
 - **`retrieval_benchmark.md`** — human-readable tables (or path passed to `--output` on `--write-benchmark-md`).
-- **`storage/benchmark_results.json`** — machine-readable rows (strategy A/B blocks + `comparison`: `overlap_count`, `winner`, `reason`), written when the markdown export step runs.
+- **`storage/benchmark_results.json`** — machine-readable rows (strategy A/B blocks + `comparison`: `overlap_count`, `winner`, `reason`), written when the benchmark / markdown export steps run.
+
+### Per-run directory: `output/<RUN_ID>/`
+
+**`RUN_ID`** is a UTC timestamp plus a short hex suffix (example: `20260514T183023Z-c50fd910`). Both **`orchestrator.py`** and **`query_cli.py`** create this folder at the **repository root** and write:
+
+| Artifact | Purpose |
+|----------|---------|
+| **`manifest.json`** | `argv`, planned steps, paths, `started_at`. |
+| **`config.snapshot.yaml`** | Copy of `config/config.yaml` at run start. |
+| **`summary.json`** | Final status and per-step list (exit codes, durations, artifact filenames). |
+| **`step_*.json`** / **`.log`** / **`.md`** | Step outputs (e.g. `step_pytest.log`, `step_benchmark.json`, `step_smoke.json`, or query-cli `step_ingest.json`). |
+| **`queries.jsonl`** | **`query_cli.py` only** — one JSON line per user query (Strategy A hits + Strategy B expanded query and hits). |
+
+The orchestrator also prints the resolved artifact path on **stderr** when a run finishes successfully.
 
 ---
 
