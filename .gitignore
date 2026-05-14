@@ -9,3 +9,5 @@ chroma_persist/
 faiss_indexes/
 *.egg-info/
 storage/
+output/
+data/cache/

@@ -1,4 +1,10 @@
-"""RAG Engine orchestrator (plan §7)."""
+"""
+``RAGEngine`` — library entrypoint for ingest + Strategy A/B search (plan §7).
+
+This is **not** the shell multi-step runner. For pytest / benchmark / smoke / markdown
+steps that write under ``output/<RUN_ID>/``, use **``orchestrator.py``** at the repo root.
+For **interactive queries** on a long plaintext corpus with real embeddings, use **``query_cli.py``**.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +14,7 @@ from rag_engine.chunking.factory import create_chunker
 from rag_engine.config.loader import load_engine_config
 from rag_engine.config.schema import EngineConfig
 from rag_engine.documents.loader import load_documents_json
+from rag_engine.documents.models import Document
 from rag_engine.embeddings.factory import create_embedder, tokenizer_encode_decode
 from rag_engine.retrieval.query_expander import MockGenerativeModel, QueryExpander
 from rag_engine.retrieval.retriever import Retriever
@@ -34,7 +41,11 @@ class RAGEngine:
     def ingest(self, documents_path: str | Path | None = None) -> int:
         path = Path(documents_path) if documents_path is not None else Path(self.config.data.input_path)
         docs = load_documents_json(path, self.config.data.text_field, self.config.data.id_field)
-        chunks = self.chunker.split_documents(docs)
+        return self.ingest_documents(docs)
+
+    def ingest_documents(self, documents: list[Document]) -> int:
+        """Chunk, embed, and index the given documents (same path as :meth:`ingest`)."""
+        chunks = self.chunker.split_documents(documents)
         texts = [c.text for c in chunks]
         embeddings = self.embedder.embed_documents(texts)
         self.vector_store.add(chunks, embeddings)

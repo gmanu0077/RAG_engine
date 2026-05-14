@@ -3,12 +3,13 @@
 Orchestrator for the RAG assessment repo: run tests, benchmarks, smoke checks,
 and optional benchmark markdown export in a single entrypoint.
 
-Each run gets a ``RUN_ID`` (UTC timestamp + short hex). **Orchestrator logs always
-go to stderr** (no flag to disable them). ``--no-rich`` only skips the optional Rich
-table after a benchmark; it does not affect orchestrator logging.
+Each run gets a ``RUN_ID`` (UTC timestamp + short hex). Artifacts for every executed
+step are written under **``output/<RUN_ID>/``** at the repo root (logs, JSON, config
+snapshot, final ``summary.json``). **Orchestrator logs always go to stderr** (no flag
+to disable them). ``--no-rich`` only skips the optional Rich table after a benchmark.
 
-Primary payloads (e.g. benchmark JSON) go to **stdout** so you can ``2>run.log`` or
-pipe JSON with ``| jq``.
+Benchmark JSON is still printed to **stdout** for piping; a copy is saved under
+``output/<RUN_ID>/step_benchmark.json``.
 
 Examples (use ``python3`` on macOS if ``python`` is not installed):
   python3 orchestrator.py --list-steps
@@ -25,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -75,13 +77,52 @@ def _emit_orchestrator_footer(run_id: str, message: str) -> None:
     print(_banner("="), file=sys.stderr, flush=True)
 
 
+def _prepare_output_run_dir(run_id: str, argv_repr: str, plan: list[str]) -> Path:
+    """Create ``output/<RUN_ID>/`` with manifest + config snapshot."""
+    d = ROOT / "output" / run_id
+    d.mkdir(parents=True, exist_ok=True)
+    cfg = ROOT / "config" / "config.yaml"
+    if cfg.is_file():
+        shutil.copy2(cfg, d / "config.snapshot.yaml")
+    (d / "manifest.json").write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "started_at": datetime.now(timezone.utc).isoformat(),
+                "argv": argv_repr,
+                "planned_steps": plan,
+                "output_dir": str(d.resolve()),
+                "repo_root": str(ROOT.resolve()),
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return d
+
+
+def _write_run_summary(run_dir: Path, run_id: str, status: str, steps: list[dict]) -> None:
+    (run_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "status": status,
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "steps": steps,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
 def _ensure_src_path() -> None:
     s = str(SRC)
     if s not in sys.path:
         sys.path.insert(0, s)
 
 
-def step_pytest(extra_pytest_args: list[str]) -> int:
+def step_pytest(extra_pytest_args: list[str], run_dir: Path) -> int:
     cmd = [sys.executable, "-m", "pytest", "tests/"]
     if extra_pytest_args:
         cmd.extend(extra_pytest_args)
@@ -90,10 +131,12 @@ def step_pytest(extra_pytest_args: list[str]) -> int:
     env = os.environ.copy()
     prev = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = str(SRC) if not prev else f"{SRC}{os.pathsep}{prev}"
-    return subprocess.call(cmd, cwd=ROOT, env=env)
+    log_path = run_dir / "step_pytest.log"
+    with log_path.open("w", encoding="utf-8") as logf:
+        return subprocess.call(cmd, cwd=ROOT, env=env, stdout=logf, stderr=subprocess.STDOUT)
 
 
-def step_benchmark(no_rich: bool, run_id: str) -> int:
+def step_benchmark(no_rich: bool, run_id: str, run_dir: Path) -> int:
     _ensure_src_path()
     import json as json_module
 
@@ -117,13 +160,14 @@ def step_benchmark(no_rich: bool, run_id: str) -> int:
     results = run_strategy_benchmark(engine.retriever, cfg, queries=cfg.benchmark.queries)
     _log(run_id, f"benchmark: queries finished elapsed_ms={1000*(time.perf_counter()-t1):.0f}")
     payload = {"chunks_indexed": n, "strategy_a_vs_b": benchmark_results_to_jsonable(results)}
+    out_json = json_module.dumps(payload, indent=2)
+    (run_dir / "step_benchmark.json").write_text(out_json + "\n", encoding="utf-8")
     _log(run_id, "benchmark: JSON OUTPUT (stdout, pipe-safe) -----")
-    print(json_module.dumps(payload, indent=2), flush=True)
+    print(out_json, flush=True)
     _log(run_id, "benchmark: end JSON OUTPUT -----")
 
     if not no_rich:
-        _log(run_id, "benchmark: Rich table OUTPUT (stderr) -----")
-        console = Console(stderr=True)
+        _log(run_id, "benchmark: Rich table OUTPUT (stderr + output folder) -----")
         table = Table(title="Strategy A vs B (top-1 preview)", show_lines=True)
         table.add_column("Query", max_width=36)
         table.add_column("A chunk", max_width=14)
@@ -140,12 +184,14 @@ def step_benchmark(no_rich: bool, run_id: str) -> int:
                 b0.chunk_id if b0 else "",
                 f"{b0.score:.4f}" if b0 else "",
             )
-        console.print(table)
+        Console(stderr=True).print(table)
+        with (run_dir / "step_benchmark_rich.txt").open("w", encoding="utf-8") as tf:
+            Console(file=tf, width=120).print(table)
         _log(run_id, "benchmark: end Rich table OUTPUT -----")
     return 0
 
 
-def step_smoke(run_id: str) -> int:
+def step_smoke(run_id: str, run_dir: Path) -> int:
     _ensure_src_path()
     from rag_engine.app import RAGEngine
     from rag_engine.config.loader import load_engine_config
@@ -164,15 +210,23 @@ def step_smoke(run_id: str) -> int:
     docs = load_documents_json(path, cfg.data.text_field, cfg.data.id_field)
     n = engine.ingest(path)
     _log(run_id, f"smoke: documents={len(docs)} chunks_indexed={n}")
+    summary = {
+        "run_id": run_id,
+        "dataset": str(path.resolve()),
+        "document_count": len(docs),
+        "chunks_indexed": n,
+    }
+    (run_dir / "step_smoke.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     _log(run_id, "smoke: OUTPUT (summary)", out=True)
     print(f"  run_id:              {run_id}", flush=True)
     print(f"  dataset:             {path}", flush=True)
     print(f"  documents:           {len(docs)}", flush=True)
     print(f"  chunks indexed:      {n}", flush=True)
+    print(f"  artifacts:           {run_dir / 'step_smoke.json'}", flush=True)
     return 0
 
 
-def step_write_benchmark_md(output: Path, run_id: str) -> int:
+def step_write_benchmark_md(output: Path, run_id: str, run_dir: Path) -> int:
     _ensure_src_path()
     from rag_engine.app import RAGEngine
     from rag_engine.config.loader import load_engine_config
@@ -199,7 +253,7 @@ Compare raw vector retrieval (Strategy A) against mocked query expansion (Strate
 
 ## Machine-readable output
 
-Generated via ``python3 main.py --write-benchmark-md``. JSON snapshot (also written to ``storage/benchmark_results.json``):
+Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (also written to ``storage/benchmark_results.json`` per config):
 
 ```json
 """
@@ -211,10 +265,22 @@ Generated via ``python3 main.py --write-benchmark-md``. JSON snapshot (also writ
 Regenerate this file after corpus or retrieval changes. Strategy B can improve recall on ambiguous queries but may reduce top-1 precision when expansions misalign with the corpus; production needs score thresholds, filters, and monitoring.
 """
     output.write_text(header + js + footer, encoding="utf-8")
+    shutil.copy2(output, run_dir / "step_write_benchmark_md.md")
+    if cfg.benchmark.output_json.is_file():
+        shutil.copy2(cfg.benchmark.output_json, run_dir / "step_write_benchmark_rows.json")
+    meta = {
+        "run_id": run_id,
+        "chunks_indexed": n,
+        "markdown_root": str(output.resolve()),
+        "markdown_copy": str((run_dir / "step_write_benchmark_md.md").resolve()),
+        "json_storage_path": str(cfg.benchmark.output_json.resolve()),
+    }
+    (run_dir / "step_write_benchmark_md.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     _log(run_id, f"write-benchmark-md: wrote {len(header + js + footer)} bytes")
     _log(run_id, "write-benchmark-md: OUTPUT", out=True)
     print(f"  path:   {output.resolve()}", flush=True)
     print(f"  bytes:  {output.stat().st_size}", flush=True)
+    print(f"  copy:   {run_dir / 'step_write_benchmark_md.md'}", flush=True)
     return 0
 
 
@@ -228,16 +294,20 @@ def _run_steps(
     names: list[str],
     *,
     run_id: str,
+    run_dir: Path,
     benchmark_no_rich: bool,
     md_output: Path,
     pytest_extra: list[str],
 ) -> int:
     total = len(names)
     _log(run_id, f"planned steps ({total}): {', '.join(names)}")
+    step_records: list[dict] = []
 
     for i, name in enumerate(names, start=1):
         if name not in STEP_DESCRIPTIONS:
             _log(run_id, f"unknown step: {name!r} (use --list-steps)")
+            step_records.append({"step": name, "index": i, "exit_code": 2, "error": "unknown_step"})
+            _write_run_summary(run_dir, run_id, "failed", step_records)
             _emit_orchestrator_footer(run_id, f"RUN FAILED  unknown_step={name!r}")
             return 2
 
@@ -249,18 +319,54 @@ def _run_steps(
         t0 = time.perf_counter()
         if name == "pytest":
             _log(run_id, "pytest: command " + " ".join(_pytest_cmd(pytest_extra)))
-            _log(run_id, "pytest: OUTPUT (subprocess stdout/stderr) -----")
-            code = step_pytest(pytest_extra)
-            _log(run_id, "pytest: end subprocess OUTPUT -----")
+            _log(run_id, f"pytest: log -> {run_dir / 'step_pytest.log'}")
+            code = step_pytest(pytest_extra, run_dir)
+            rec: dict = {
+                "step": name,
+                "index": i,
+                "exit_code": code,
+                "duration_ms": round((time.perf_counter() - t0) * 1000.0, 1),
+                "artifacts": ["step_pytest.log"],
+            }
         elif name == "benchmark":
-            code = step_benchmark(benchmark_no_rich, run_id)
+            code = step_benchmark(benchmark_no_rich, run_id, run_dir)
+            arts = ["step_benchmark.json"]
+            if not benchmark_no_rich:
+                arts.append("step_benchmark_rich.txt")
+            rec = {
+                "step": name,
+                "index": i,
+                "exit_code": code,
+                "duration_ms": round((time.perf_counter() - t0) * 1000.0, 1),
+                "artifacts": arts,
+            }
         elif name == "smoke":
-            code = step_smoke(run_id)
+            code = step_smoke(run_id, run_dir)
+            rec = {
+                "step": name,
+                "index": i,
+                "exit_code": code,
+                "duration_ms": round((time.perf_counter() - t0) * 1000.0, 1),
+                "artifacts": ["step_smoke.json"],
+            }
         elif name == "write-benchmark-md":
-            code = step_write_benchmark_md(md_output, run_id)
+            code = step_write_benchmark_md(md_output, run_id, run_dir)
+            rec = {
+                "step": name,
+                "index": i,
+                "exit_code": code,
+                "duration_ms": round((time.perf_counter() - t0) * 1000.0, 1),
+                "artifacts": [
+                    "step_write_benchmark_md.md",
+                    "step_write_benchmark_md.json",
+                    "step_write_benchmark_rows.json",
+                ],
+            }
         else:
             code = 2
-        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            rec = {"step": name, "index": i, "exit_code": code, "duration_ms": 0.0, "error": "internal"}
+        elapsed_ms = rec["duration_ms"]
+        step_records.append(rec)
 
         print(_banner("-"), file=sys.stderr, flush=True)
         _log(run_id, f"STEP {i}/{total} END    name={name}  exit_code={code}  duration_ms={elapsed_ms:.1f}")
@@ -268,9 +374,12 @@ def _run_steps(
 
         if code != 0:
             _log(run_id, f"aborting run: step {name!r} failed")
+            _write_run_summary(run_dir, run_id, "failed", step_records)
             _emit_orchestrator_footer(run_id, f"RUN FAILED  step={name}  exit_code={code}")
             return code
 
+    _write_run_summary(run_dir, run_id, "success", step_records)
+    _log(run_id, f"Artifacts directory: {run_dir.resolve()}", out=True)
     _emit_orchestrator_footer(run_id, f"RUN COMPLETE  all {total} step(s) succeeded")
     return 0
 
@@ -389,11 +498,14 @@ def main(argv: list[str] | None = None) -> int:
         _emit_orchestrator_footer(run_id, "RUN ABORTED (no steps)")
         return 1
 
+    run_dir = _prepare_output_run_dir(run_id, argv_repr, ordered)
     _emit_orchestrator_header(run_id, argv_repr)
+    _log(run_id, f"artifacts -> {run_dir.resolve()}")
 
     return _run_steps(
         ordered,
         run_id=run_id,
+        run_dir=run_dir,
         benchmark_no_rich=args.no_rich,
         md_output=args.output,
         pytest_extra=pytest_tail,

@@ -3,10 +3,31 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 from rag_engine.documents.models import Document
+
+
+def load_documents_plaintext(path: str | Path, *, document_id: str | None = None) -> list[Document]:
+    """Load a single ``Document`` from a UTF-8 text or markdown file (whole file = one doc).
+
+    Use this for long-form prose, logs, or books. IDs default to the file stem
+    (sanitized); metadata records ``source`` and ``path``.
+    """
+    p = Path(path)
+    if not p.is_file():
+        raise FileNotFoundError(f"Document not found: {p}")
+    text = p.read_text(encoding="utf-8")
+    stripped = text.strip()
+    if not stripped:
+        raise ValueError(f"Plaintext file is empty: {p}")
+    stem = p.stem
+    safe = re.sub(r"[^\w\-]+", "_", stem, flags=re.UNICODE).strip("_") or "document"
+    did = document_id.strip() if document_id and document_id.strip() else safe
+    meta: dict[str, Any] = {"source": "plaintext_file", "path": str(p.resolve())}
+    return [Document(document_id=did, text=stripped, metadata=meta)]
 
 
 def load_documents_json(path: str | Path, text_field: str, id_field: str) -> list[Document]:

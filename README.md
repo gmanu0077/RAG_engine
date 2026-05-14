@@ -19,6 +19,7 @@ config/config.yaml              # tunables (comments describe options + good def
 data/technical_paragraphs.json  # sample JSON list (objects with `text`, optional `id`)
 storage/                        # default benchmark JSON + vector persistence (gitignored)
 orchestrator.py                  # CLI: pytest, benchmark, smoke, markdown export
+query_cli.py                     # interactive queries on a real long .txt/.md or Gutenberg sample
 scripts/run_benchmark.py        # ingest + benchmark JSON (+ Rich table on stderr)
 src/rag_engine/
   app.py                        # RAGEngine: ingest, search_raw, search_expanded
@@ -88,6 +89,22 @@ python3 orchestrator.py --steps pytest,benchmark
 
 # Or the default “CI-style” pair (pytest then benchmark):
 python3 orchestrator.py --all
+```
+
+### Interactive retrieval (real embeddings, long document)
+
+Use **`query_cli.py`** when the goal is a **single large plaintext corpus** and you only want to **type queries** after ingest. It uses **`config/config.yaml`** as-is (typically **sentence-transformers** + **FAISS**), keeps indexes under **`output/<RUN_ID>/vector_index/`** (so default **`storage/`** is not overwritten), and records the same style of run artifacts: **`manifest.json`**, **`config.snapshot.yaml`**, **`step_*.json`**, **`queries.jsonl`**, **`summary.json`**.
+
+```bash
+# Download a large public-domain book (cached under data/cache/, gitignored)
+python3 query_cli.py --fetch-sample
+python3 query_cli.py --fetch-sample 2701
+
+# Or index your own UTF-8 file (.txt / .md — whole file = one document)
+python3 query_cli.py --doc ./notes.md
+
+# One-shot (non-interactive)
+python3 query_cli.py --doc README.md --single "What is FAISS?"
 ```
 
 | Step name | Command | What it does |
