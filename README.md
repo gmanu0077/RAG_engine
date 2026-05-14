@@ -1,4 +1,4 @@
-# Semantic RAG assessment (see `plan.md`)
+# Semantic RAG assessment (see `context.md`)
 
 Local **context-aware retrieval engine**: everything is driven from **`config/config.yaml`**. The stack includes config-driven **chunking**, **embeddings** (`sentence_transformers` or **`mock_vertex`** for fast tests), **vector stores** (**FAISS** with Flat / **HNSW** / IVF / IVF-PQ + **auto** policy, **Chroma**, or **NumPy** exact baseline), and two retrieval strategies:
 
@@ -14,7 +14,7 @@ Benchmarks emit **JSON** (overlap, winner heuristic, per-hit previews) and optio
 ## Repository layout
 
 ```text
-plan.md                         # full architecture + config spec
+context.md                         # full architecture + config spec
 config/config.yaml              # tunables (comments describe options + good defaults)
 data/technical_paragraphs.json  # sample JSON list (objects with `text`, optional `id`)
 storage/                        # default benchmark JSON + vector persistence (gitignored)
@@ -187,13 +187,13 @@ You may already be synced, or everything is ignored. Check with `git status`. To
 
 ## Configuration
 
-Edit **`config/config.yaml`**. Inline comments explain each block and point to sensible defaults aligned with **`plan.md`** (e.g. **recursive** chunking, **cosine** similarity, **`faiss` + `hnsw`**, `sentence-transformers/all-MiniLM-L6-v2`).
+Edit **`config/config.yaml`**. Inline comments explain each block and point to sensible defaults aligned with **`context.md`** (e.g. **recursive** chunking, **cosine** similarity, **`faiss` + `hnsw`**, `sentence-transformers/all-MiniLM-L6-v2`).
 
 Notable keys:
 
 - **`data.input_path`** — JSON list of records; each must include **`data.text_field`** (default `text`).
 - **`vector_store.provider`** — `faiss` | `chroma` | `numpy`.
-- **`vector_store.faiss`** — `index_type` (`flat`, `hnsw`, `ivf_flat`, `ivf_pq`, `auto`) and `index_selection_policy` (`manual` | `auto`); see `plan.md` §9.
+- **`vector_store.faiss`** — `index_type` (`flat`, `hnsw`, `ivf_flat`, `ivf_pq`, `auto`) and `index_selection_policy` (`manual` | `auto`); see `context.md` §9.
 - **`retrieval.top_k` / `retrieval.fetch_k`** — over-fetch then trim to `top_k`.
 - **`benchmark.output_json`** / **`benchmark.output_markdown`** — default `storage/benchmark_results.json` and `retrieval_benchmark.md` (override `--output` only affects the markdown step in the orchestrator).
 
@@ -237,7 +237,7 @@ For **`similarity.metric`** `cosine` or `inner_product`, embeddings used with FA
 
 ## Production migration
 
-See **`plan.md` §14**: keep chunking and retrieval abstractions; swap **`SentenceTransformerEmbedder`** for Vertex embeddings and the vector store for **Vertex AI Vector Search**; hydrate chunk text by returned IDs from your metadata store.
+See **`context.md` §14**: keep chunking and retrieval abstractions; swap **`SentenceTransformerEmbedder`** for Vertex embeddings and the vector store for **Vertex AI Vector Search**; hydrate chunk text by returned IDs from your metadata store.
 
 ---
 
@@ -245,4 +245,4 @@ See **`plan.md` §14**: keep chunking and retrieval abstractions; swap **`Senten
 
 - Small sample corpus; not a substitute for labeled relevance sets.
 - Strategy **B** uses **deterministic mock** expansions, not a live Gemini / GPT.
-- **Auto** FAISS index selection follows **`plan.md` §9** when `faiss.index_selection_policy` is **`auto`**.
+- **Auto** FAISS index selection follows **`context.md` §9** when `faiss.index_selection_policy` is **`auto`**.
