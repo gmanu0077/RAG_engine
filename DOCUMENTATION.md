@@ -80,7 +80,9 @@ config/config.yaml
 
 ### 4.1 Default embedder
 
-**`sentence-transformers/all-MiniLM-L6-v2`** is the default: widely available, good baseline for short technical text, 384 dimensions. The wrapper aligns **`max_seq_length`** with the backbone’s **`max_position_embeddings`** (512) where the library had defaulted lower, so chunk budgets in config remain consistent with what the model can encode without silent truncation.
+**Default embedder:** **`BAAI/bge-small-en-v1.5`** (retrieval-tuned, 384 dimensions, 512-token context). Config sets **`embedding.query_instruction`** so **`embed_query`** prepends the official BGE query prefix; **`embed_documents`** does not (asymmetric retrieval, analogous to Vertex `RETRIEVAL_QUERY` vs `RETRIEVAL_DOCUMENT`). To use a symmetric model instead (e.g. `sentence-transformers/all-MiniLM-L6-v2`), change **`model_name`** and set **`query_instruction: ""`**.
+
+The wrapper aligns **`max_seq_length`** with the backbone’s **`max_position_embeddings`** when the ST package caps it low, so chunk budgets stay consistent with the model window.
 
 **Mock path:** `MockVertexEmbedder` routes through the **same API shape** as Vertex `TextEmbeddingModel.from_pretrained(...).get_embeddings([TextEmbeddingInput(...)])` implemented in `gcp_mocks.py`, so tests exercise the SDK surface without calling Google.
 

@@ -18,6 +18,7 @@ def create_embedder(cfg: EngineConfig) -> BaseEmbedder:
         model_name=cfg.embedding.model_name,
         batch_size=cfg.embedding.batch_size,
         normalize_embeddings=cfg.embedding.normalize_embeddings,
+        query_instruction=cfg.embedding.query_instruction,
     )
 
 
@@ -28,7 +29,13 @@ def tokenizer_encode_decode(embedder: BaseEmbedder):
         return None, None
 
     def encode(text: str) -> list[int]:
-        return tok.encode(text, add_special_tokens=False)
+        # Chunking must see the *true* token count. Some HF defaults can cap counts or warn
+        # when model_max_length is misaligned; never truncate here.
+        return tok.encode(
+            text,
+            add_special_tokens=False,
+            truncation=False,
+        )
 
     def decode(ids: list[int]) -> str:
         return tok.decode(ids, skip_special_tokens=True)

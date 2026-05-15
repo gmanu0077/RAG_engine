@@ -2,7 +2,7 @@
 
 ## Objective
 
-Compare raw vector retrieval (Strategy A) against mocked query expansion (Strategy B). See ``plan.md`` and ``config/config.yaml`` for architecture and tunables.
+Compare raw vector retrieval (Strategy A) against mocked query expansion (Strategy B). Default embedding model is **BAAI/bge-small-en-v1.5** with an asymmetric **query instruction** on Strategy A/B queries (see ``config/config.yaml``). See ``plan.md`` / ``context.md`` and ``DOCUMENTATION.md`` for architecture and methodology.
 
 ## Machine-readable output
 
@@ -20,7 +20,7 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           {
             "rank": 1,
             "chunk_id": "doc_000_chunk_000",
-            "score": 0.451218,
+            "score": 0.686012,
             "text_preview": "During peak load the API tier scales horizontally using Kubernetes HPA targets based on CPU and custom request-queue depth signals. New pods join the service mesh within seconds; connection draining ensures in-flight wor",
             "metadata": {
               "source": "dataset",
@@ -29,22 +29,22 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           },
           {
             "rank": 2,
-            "chunk_id": "doc_002_chunk_000",
-            "score": 0.342084,
-            "text_preview": "When the primary Redis tier becomes unhealthy the application degrades gracefully by bypassing cache reads and writes, falling back to authoritative database queries while emitting elevated latency alerts to SRE dashboar",
-            "metadata": {
-              "source": "dataset",
-              "document_id": "doc_002"
-            }
-          },
-          {
-            "rank": 3,
             "chunk_id": "doc_003_chunk_000",
-            "score": 0.319287,
+            "score": 0.596352,
             "text_preview": "Read replicas serve analytical queries and offload the primary writer. Replica lag is monitored continuously; queries that require strongly consistent reads are pinned to the primary connection pool. Transactions on the ",
             "metadata": {
               "source": "dataset",
               "document_id": "doc_003"
+            }
+          },
+          {
+            "rank": 3,
+            "chunk_id": "doc_001_chunk_000",
+            "score": 0.595259,
+            "text_preview": "The edge cache uses a two-tier design: an in-memory LRU for hot keys and a regional Redis cluster for shared objects. TTLs are staggered to prevent thundering herds when popular keys expire at the same instant.",
+            "metadata": {
+              "source": "dataset",
+              "document_id": "doc_001"
             }
           }
         ]
@@ -56,7 +56,7 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           {
             "rank": 1,
             "chunk_id": "doc_000_chunk_000",
-            "score": 0.53761,
+            "score": 0.741233,
             "text_preview": "During peak load the API tier scales horizontally using Kubernetes HPA targets based on CPU and custom request-queue depth signals. New pods join the service mesh within seconds; connection draining ensures in-flight wor",
             "metadata": {
               "source": "dataset",
@@ -66,7 +66,7 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           {
             "rank": 2,
             "chunk_id": "doc_001_chunk_000",
-            "score": 0.383281,
+            "score": 0.702441,
             "text_preview": "The edge cache uses a two-tier design: an in-memory LRU for hot keys and a regional Redis cluster for shared objects. TTLs are staggered to prevent thundering herds when popular keys expire at the same instant.",
             "metadata": {
               "source": "dataset",
@@ -75,19 +75,19 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           },
           {
             "rank": 3,
-            "chunk_id": "doc_003_chunk_000",
-            "score": 0.366839,
-            "text_preview": "Read replicas serve analytical queries and offload the primary writer. Replica lag is monitored continuously; queries that require strongly consistent reads are pinned to the primary connection pool. Transactions on the ",
+            "chunk_id": "doc_004_chunk_000",
+            "score": 0.696497,
+            "text_preview": "Cross-region writes flow through a conflict-free replicated data type for inventory counters while user profile updates use last-write-wins with vector clocks to survive partial network partitions between regions.",
             "metadata": {
               "source": "dataset",
-              "document_id": "doc_003"
+              "document_id": "doc_004"
             }
           }
         ]
       },
       "comparison": {
         "overlap_count": 2,
-        "top1_score_delta_b_minus_a": 0.086391,
+        "top1_score_delta_b_minus_a": 0.055222,
         "notes": "Strategy A and Strategy B embed different query strings; rank-1 cosine values are not directly comparable as a quality score (higher B does not imply better retrieval). Top-1 chunk id matches; deeper ranks may still differ."
       }
     },
@@ -99,7 +99,7 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           {
             "rank": 1,
             "chunk_id": "doc_008_chunk_000",
-            "score": 0.58265,
+            "score": 0.674185,
             "text_preview": "When downstream services are unavailable the edge gateway sheds optional traffic, applies circuit breakers per dependency, and uses exponential backoff retries only for idempotent verbs. Timeouts are budgeted end-to-end ",
             "metadata": {
               "source": "dataset",
@@ -109,7 +109,7 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           {
             "rank": 2,
             "chunk_id": "doc_005_chunk_000",
-            "score": 0.424505,
+            "score": 0.636236,
             "text_preview": "Event ingestion pipelines batch acknowledgements and apply backpressure when downstream sinks lag. Poison messages are quarantined after configurable retry budgets to protect overall throughput. Consumer offsets are chec",
             "metadata": {
               "source": "dataset",
@@ -118,12 +118,12 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           },
           {
             "rank": 3,
-            "chunk_id": "doc_009_chunk_000",
-            "score": 0.334732,
-            "text_preview": "The platform recovers from infrastructure failure by promoting warm replicas in a secondary region, replaying durable logs, and automating runbooks that validate data checksums before shifting user traffic back to the he",
+            "chunk_id": "doc_007_chunk_000",
+            "score": 0.585857,
+            "text_preview": "Distributed traces stitch HTTP spans with queue consumers and database calls. SLO burn alerts trigger paging when error budgets drain faster than the weekly rolling window allows.",
             "metadata": {
               "source": "dataset",
-              "document_id": "doc_009"
+              "document_id": "doc_007"
             }
           }
         ]
@@ -135,7 +135,7 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           {
             "rank": 1,
             "chunk_id": "doc_008_chunk_000",
-            "score": 0.618051,
+            "score": 0.751168,
             "text_preview": "When downstream services are unavailable the edge gateway sheds optional traffic, applies circuit breakers per dependency, and uses exponential backoff retries only for idempotent verbs. Timeouts are budgeted end-to-end ",
             "metadata": {
               "source": "dataset",
@@ -145,7 +145,7 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           {
             "rank": 2,
             "chunk_id": "doc_005_chunk_000",
-            "score": 0.456833,
+            "score": 0.698801,
             "text_preview": "Event ingestion pipelines batch acknowledgements and apply backpressure when downstream sinks lag. Poison messages are quarantined after configurable retry budgets to protect overall throughput. Consumer offsets are chec",
             "metadata": {
               "source": "dataset",
@@ -154,19 +154,19 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           },
           {
             "rank": 3,
-            "chunk_id": "doc_009_chunk_000",
-            "score": 0.363646,
-            "text_preview": "The platform recovers from infrastructure failure by promoting warm replicas in a secondary region, replaying durable logs, and automating runbooks that validate data checksums before shifting user traffic back to the he",
+            "chunk_id": "doc_007_chunk_000",
+            "score": 0.624171,
+            "text_preview": "Distributed traces stitch HTTP spans with queue consumers and database calls. SLO burn alerts trigger paging when error budgets drain faster than the weekly rolling window allows.",
             "metadata": {
               "source": "dataset",
-              "document_id": "doc_009"
+              "document_id": "doc_007"
             }
           }
         ]
       },
       "comparison": {
         "overlap_count": 3,
-        "top1_score_delta_b_minus_a": 0.035401,
+        "top1_score_delta_b_minus_a": 0.076983,
         "notes": "Strategy A and Strategy B embed different query strings; rank-1 cosine values are not directly comparable as a quality score (higher B does not imply better retrieval). Top-1 chunk id matches; deeper ranks may still differ."
       }
     },
@@ -178,7 +178,7 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           {
             "rank": 1,
             "chunk_id": "doc_006_chunk_000",
-            "score": 0.295643,
+            "score": 0.688081,
             "text_preview": "Tenant isolation enforces row-level security at the database layer and mutual TLS between microservices. Secrets never appear in logs\u2014only opaque identifiers are printed for correlation.",
             "metadata": {
               "source": "dataset",
@@ -187,22 +187,22 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           },
           {
             "rank": 2,
-            "chunk_id": "doc_010_chunk_000",
-            "score": 0.22097,
-            "text_preview": "Repeated processing of the same request is prevented by idempotency keys stored in a short-lived deduplication table; clients replaying a submission receive the original response without double-charging inventory or re-e",
-            "metadata": {
-              "source": "dataset",
-              "document_id": "doc_010"
-            }
-          },
-          {
-            "rank": 3,
             "chunk_id": "doc_003_chunk_000",
-            "score": 0.127738,
+            "score": 0.602094,
             "text_preview": "Read replicas serve analytical queries and offload the primary writer. Replica lag is monitored continuously; queries that require strongly consistent reads are pinned to the primary connection pool. Transactions on the ",
             "metadata": {
               "source": "dataset",
               "document_id": "doc_003"
+            }
+          },
+          {
+            "rank": 3,
+            "chunk_id": "doc_008_chunk_000",
+            "score": 0.575678,
+            "text_preview": "When downstream services are unavailable the edge gateway sheds optional traffic, applies circuit breakers per dependency, and uses exponential backoff retries only for idempotent verbs. Timeouts are budgeted end-to-end ",
+            "metadata": {
+              "source": "dataset",
+              "document_id": "doc_008"
             }
           }
         ]
@@ -214,7 +214,7 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           {
             "rank": 1,
             "chunk_id": "doc_006_chunk_000",
-            "score": 0.686261,
+            "score": 0.820476,
             "text_preview": "Tenant isolation enforces row-level security at the database layer and mutual TLS between microservices. Secrets never appear in logs\u2014only opaque identifiers are printed for correlation.",
             "metadata": {
               "source": "dataset",
@@ -223,29 +223,29 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
           },
           {
             "rank": 2,
+            "chunk_id": "doc_008_chunk_000",
+            "score": 0.621699,
+            "text_preview": "When downstream services are unavailable the edge gateway sheds optional traffic, applies circuit breakers per dependency, and uses exponential backoff retries only for idempotent verbs. Timeouts are budgeted end-to-end ",
+            "metadata": {
+              "source": "dataset",
+              "document_id": "doc_008"
+            }
+          },
+          {
+            "rank": 3,
             "chunk_id": "doc_001_chunk_000",
-            "score": 0.245331,
+            "score": 0.617088,
             "text_preview": "The edge cache uses a two-tier design: an in-memory LRU for hot keys and a regional Redis cluster for shared objects. TTLs are staggered to prevent thundering herds when popular keys expire at the same instant.",
             "metadata": {
               "source": "dataset",
               "document_id": "doc_001"
             }
-          },
-          {
-            "rank": 3,
-            "chunk_id": "doc_004_chunk_000",
-            "score": 0.226724,
-            "text_preview": "Cross-region writes flow through a conflict-free replicated data type for inventory counters while user profile updates use last-write-wins with vector clocks to survive partial network partitions between regions.",
-            "metadata": {
-              "source": "dataset",
-              "document_id": "doc_004"
-            }
           }
         ]
       },
       "comparison": {
-        "overlap_count": 1,
-        "top1_score_delta_b_minus_a": 0.390618,
+        "overlap_count": 2,
+        "top1_score_delta_b_minus_a": 0.132395,
         "notes": "Strategy A and Strategy B embed different query strings; rank-1 cosine values are not directly comparable as a quality score (higher B does not imply better retrieval). Top-1 chunk id matches; deeper ranks may still differ."
       }
     }
@@ -253,6 +253,6 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
 }
 ```
 
-## Conclusion
+## Notes
 
-Regenerate this file after corpus or retrieval changes. Strategy B can improve recall on ambiguous queries but may reduce top-1 precision when expansions misalign with the corpus; production needs score thresholds, filters, and monitoring.
+Regenerate after corpus or **embedding** changes. The embedded JSON uses neutral ``comparison`` fields (overlap, informational score delta, ``expansion_changed``); it does **not** declare a cross-strategy ``winner`` from cosine magnitudes alone.

@@ -148,7 +148,7 @@ Logs go to **stderr**; benchmark JSON goes to **stdout** (pipe-friendly).
 ```bash
 python3 orchestrator.py --list-steps
 python3 orchestrator.py --smoke
-python3 orchestrator.py --benchmark              # may download MiniLM on first run
+python3 orchestrator.py --benchmark              # may download BGE-small on first run
 python3 orchestrator.py --benchmark --no-rich    # skip Rich table on stderr
 python3 orchestrator.py --write-benchmark-md --output retrieval_benchmark.md
 python3 orchestrator.py --all                     # pytest then benchmark only
@@ -234,7 +234,7 @@ You may already be synced, or everything is ignored. Check with `git status`. To
 
 ## Configuration
 
-Edit **`config/config.yaml`**. Inline comments explain each block and point to sensible defaults aligned with **`context.md`** (e.g. **recursive** chunking, **cosine** similarity, **`faiss` + `hnsw`**, `sentence-transformers/all-MiniLM-L6-v2`).
+Edit **`config/config.yaml`**. Inline comments explain each block and point to sensible defaults aligned with **`context.md`** (e.g. **recursive** chunking, **cosine** similarity, **`faiss` + `hnsw`**, default **`BAAI/bge-small-en-v1.5`** with optional **`query_instruction`** for asymmetric retrieval).
 
 Notable keys:
 
@@ -282,7 +282,7 @@ The orchestrator **smoke** step does exactly that.
 
 ### Why cosine (or inner product on normalized vectors) for text
 
-Semantic text models are trained with **cosine-style contrastive objectives**: what matters is the **direction** of the embedding (which topics / phrases it aligns with), not the raw **magnitude** (length can grow with text length and surface form). **Cosine similarity** measures alignment of directions. **Euclidean distance on the same vectors** mixes direction and length, so it is usually a poor default for general text retrieval with models like MiniLM unless the model was explicitly trained for L2 geometry.
+Semantic text models are trained with **cosine-style contrastive objectives**: what matters is the **direction** of the embedding (which topics / phrases it aligns with), not the raw **magnitude** (length can grow with text length and surface form). **Cosine similarity** measures alignment of directions. **Euclidean distance on the same vectors** mixes direction and length, so it is usually a poor default for general text retrieval with models like **BGE** or **MiniLM** unless the model was explicitly trained for L2 geometry.
 
 ### When Euclidean can make sense
 

@@ -72,9 +72,13 @@ class MockVertexEmbeddingParams(BaseModel):
 
 class EmbeddingConfig(BaseModel):
     provider: Literal["sentence_transformers", "mock_vertex"] = "sentence_transformers"
-    model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    model_name: str = "BAAI/bge-small-en-v1.5"
     batch_size: int = Field(default=32, ge=1)
     normalize_embeddings: bool = True
+    query_instruction: str = Field(
+        default="",
+        description="Prepended to text in embed_query only (BGE-style asymmetric retrieval). Empty for symmetric models.",
+    )
     mock_vertex: MockVertexEmbeddingParams = Field(default_factory=MockVertexEmbeddingParams)
 
 

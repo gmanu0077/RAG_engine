@@ -36,7 +36,7 @@ chunking:
   algorithm: recursive
 
   recursive:
-    # ~350 tokens is a strong default for MiniLM-class models (plan §8).
+    # ~350 tokens fits BGE-small (512) and MiniLM-class backbones (plan §8).
     chunk_size_tokens: 350
     chunk_overlap_tokens: 60
     separators:
@@ -68,14 +68,16 @@ chunking:
 # Embeddings (plan §8 embedding)
 # -----------------------------------------------------------------------------
 # provider:
-#   sentence_transformers — BEST for real semantic quality (local).
+#   sentence_transformers — default: BAAI/bge-small-en-v1.5 (retrieval-tuned, 384-dim, 512 ctx).
 #   mock_vertex           — deterministic tiny vectors; BEST for fast CI.
 embedding:
   provider: sentence_transformers
-  model_name: sentence-transformers/all-MiniLM-L6-v2
+  model_name: BAAI/bge-small-en-v1.5
   batch_size: 32
   # true = L2-normalize; REQUIRED for cosine / inner_product with FAISS IP.
   normalize_embeddings: true
+  # BGE: asymmetric encoding — prefix applies to embed_query only (maps to Gecko RETRIEVAL_QUERY vs DOCUMENT).
+  query_instruction: "Represent this sentence for searching relevant passages: "
 
   mock_vertex:
     dimensions: 384

@@ -20,6 +20,8 @@ def _char_token_proxy(text: str) -> int:
 # Never run the HF tokenizer on an entire book in one call (slow + warnings).
 # Recursive chunking only needs a correct count for moderate-sized strings; above
 # this size we estimate so the first split decisions still see "oversized".
+# For strings ≤ this bound, ``tokenizer_encode_decode`` uses ``truncation=False`` so
+# token counts are not capped at an old model_max_length (~256) during splitting.
 _ENCODE_SAFE_CHARS = 12_000
 
 

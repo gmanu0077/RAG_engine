@@ -8,21 +8,29 @@ from rag_engine.embeddings.base import BaseEmbedder
 
 
 class SentenceTransformerEmbedder(BaseEmbedder):
-    def __init__(self, model_name: str, batch_size: int, normalize_embeddings: bool) -> None:
+    def __init__(
+        self,
+        model_name: str,
+        batch_size: int,
+        normalize_embeddings: bool,
+        *,
+        query_instruction: str = "",
+    ) -> None:
         from sentence_transformers import SentenceTransformer
 
         self._model = SentenceTransformer(model_name)
         self._model_name = model_name
         self._batch_size = batch_size
         self._normalize = normalize_embeddings
+        self._query_instruction = query_instruction.strip() if query_instruction else ""
         self._align_max_seq_length_with_transformer()
 
     def _align_max_seq_length_with_transformer(self) -> None:
         """Raise ST's truncation window when it is below the backbone's ``max_position_embeddings``.
 
-        ``sentence_transformers`` often ships ``all-MiniLM-L6-v2`` with ``max_seq_length=256`` for
-        speed, while the underlying BERT supports **512**. Our chunker targets ~350 tokens, so
-        leaving the cap at 256 spams tokenizer warnings and truncates chunks incorrectly.
+        Some sentence-transformer packages cap ``max_seq_length`` below the backbone’s
+        ``max_position_embeddings``. Lifting the cap avoids silent truncation for chunk sizes
+        near the model window (e.g. ~350-token recursive chunks).
         """
         try:
             mod0 = self._model[0]
@@ -30,8 +38,16 @@ class SentenceTransformerEmbedder(BaseEmbedder):
             if internal is None:
                 return
             mpe = getattr(getattr(internal, "config", None), "max_position_embeddings", None)
-            if isinstance(mpe, int) and mpe > 0 and self._model.max_seq_length < mpe:
+            if not (isinstance(mpe, int) and mpe > 0):
+                return
+            if self._model.max_seq_length < mpe:
                 self._model.max_seq_length = mpe
+            tok = self._model.tokenizer
+            # Keep HF tokenizer window in sync so encode(..., truncation=False) is not capped
+            # at a stale 256-style limit while chunking targets ~350 tokens (BGE/MiniLM-class).
+            mm = getattr(tok, "model_max_length", None)
+            if isinstance(mm, int) and mm < mpe:
+                tok.model_max_length = mpe
         except Exception:
             return
 
@@ -59,10 +75,12 @@ class SentenceTransformerEmbedder(BaseEmbedder):
         return out
 
     def embed_query(self, text: str) -> list[float]:
-        if not text.strip():
+        raw = text.strip()
+        if not raw:
             raise ValueError("Cannot embed empty query.")
+        q = (self._query_instruction + raw) if self._query_instruction else raw
         vec = self._model.encode(
-            [text.strip()],
+            [q],
             convert_to_numpy=True,
             normalize_embeddings=self._normalize,
             show_progress_bar=False,

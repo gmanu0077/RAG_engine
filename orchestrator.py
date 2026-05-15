@@ -249,7 +249,7 @@ def step_write_benchmark_md(output: Path, run_id: str, run_dir: Path) -> int:
 
 ## Objective
 
-Compare raw vector retrieval (Strategy A) against mocked query expansion (Strategy B). See ``plan.md`` and ``config/config.yaml`` for architecture and tunables.
+Compare raw vector retrieval (Strategy A) against mocked query expansion (Strategy B). Default embedding model is **BAAI/bge-small-en-v1.5** with an asymmetric **query instruction** on Strategy A/B queries (see ``config/config.yaml``). See ``plan.md`` / ``context.md`` and ``DOCUMENTATION.md`` for architecture and methodology.
 
 ## Machine-readable output
 
@@ -260,9 +260,9 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
     footer = """
 ```
 
-## Conclusion
+## Notes
 
-Regenerate this file after corpus or retrieval changes. Strategy B can improve recall on ambiguous queries but may reduce top-1 precision when expansions misalign with the corpus; production needs score thresholds, filters, and monitoring.
+Regenerate after corpus or **embedding** changes. The embedded JSON uses neutral ``comparison`` fields (overlap, informational score delta, ``expansion_changed``); it does **not** declare a cross-strategy ``winner`` from cosine magnitudes alone.
 """
     output.write_text(header + js + footer, encoding="utf-8")
     shutil.copy2(output, run_dir / "step_write_benchmark_md.md")
