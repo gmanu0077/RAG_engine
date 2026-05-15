@@ -29,7 +29,7 @@ class SemanticChunker(BaseChunker):
                 if self._len_tokens(cand) <= self._p.max_chunk_tokens:
                     buf = cand
                 else:
-                    if self._len_tokens(buf) >= self._p.min_chunk_tokens:
+                    if buf.strip():
                         tid = f"{doc.document_id}_chunk_{ci:03d}"
                         out.append(
                             Chunk(

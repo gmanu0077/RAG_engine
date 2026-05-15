@@ -1,4 +1,4 @@
-"""Retrieval quality notes (plan §12 honest observations)."""
+"""Retrieval comparison notes (plan §12 — honest observations, no spurious 'winner')."""
 
 from __future__ import annotations
 
@@ -16,12 +16,24 @@ def top_score(results: list[SearchResult]) -> float | None:
     return results[0].score
 
 
+def top1_score_delta_b_minus_a(a: list[SearchResult], b: list[SearchResult]) -> float | None:
+    """Signed difference of rank-1 scores (B minus A). Not a recall metric — different queries are embedded."""
+    ta = top_score(a)
+    tb = top_score(b)
+    if ta is None or tb is None:
+        return None
+    return float(tb - ta)
+
+
 def summarize_strategy_shift(
     raw: list[SearchResult],
     expanded: list[SearchResult],
     no_match_threshold: float,
 ) -> str:
-    notes: list[str] = []
+    notes: list[str] = [
+        "Strategy A and Strategy B embed different query strings; rank-1 cosine values are not "
+        "directly comparable as a quality score (higher B does not imply better retrieval)."
+    ]
     ts_raw = top_score(raw)
     ts_exp = top_score(expanded)
     if ts_raw is not None and ts_raw < no_match_threshold:
@@ -35,20 +47,12 @@ def summarize_strategy_shift(
     rid = raw[0].chunk_id if raw else None
     eid = expanded[0].chunk_id if expanded else None
     if rid and eid and rid != eid:
-        notes.append("Top-1 chunk differs: expansion shifted lexical overlap.")
+        notes.append("Top-1 chunk id differs between strategies; compare tables for rank/shift detail.")
     elif rid and eid:
-        notes.append("Top-1 chunk matches; compare deeper ranks and score deltas.")
-
-    if ts_raw is not None and ts_exp is not None and ts_exp + 1e-6 < ts_raw:
-        notes.append(
-            "Strategy B rank-1 score is lower than Strategy A - expansion is not universally better "
-            "and can reduce precision when extra terms misalign with the corpus."
-        )
-    elif ts_raw is not None and ts_exp is not None and ts_exp > ts_raw + 1e-6:
-        notes.append("Strategy B increased the top similarity - likely improved recall for this query.")
+        notes.append("Top-1 chunk id matches; deeper ranks may still differ.")
 
     if not notes:
-        return "Review expanded query text alongside scores; ambiguous queries benefit most from expansion."
+        return "Compare chunk ids, overlap, and qualitative previews; no labelled relevance on this corpus."
     return " ".join(notes)
 
 
@@ -56,19 +60,3 @@ def overlap_count(a: list[SearchResult], b: list[SearchResult], top_n: int = 3) 
     sa = {x.chunk_id for x in a[:top_n]}
     sb = {x.chunk_id for x in b[:top_n]}
     return len(sa & sb)
-
-
-def pick_winner(a: list[SearchResult], b: list[SearchResult]) -> str:
-    ta = top_score(a)
-    tb = top_score(b)
-    if ta is None and tb is None:
-        return "tie"
-    if ta is None:
-        return "strategy_b"
-    if tb is None:
-        return "strategy_a"
-    if tb > ta + 1e-6:
-        return "strategy_b"
-    if ta > tb + 1e-6:
-        return "strategy_a"
-    return "tie"

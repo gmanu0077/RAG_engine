@@ -1,72 +1,16 @@
-"""Mock Vertex GenerativeModel + query expansion (plan §4.3)."""
+"""Query expansion (plan §4.3) via ``vertexai.language_models.GenerativeModel`` (stub or SDK)."""
 
 from __future__ import annotations
 
-import re
-
 from rag_engine.config.schema import QueryExpansionConfig
+from rag_engine.vertex_stubs import ensure_vertexai_stub_modules
 
-MOCK_EXPANSIONS: dict[str, str] = {
-    "How does the system handle peak load?": (
-        "system scalability during peak traffic, high concurrency, autoscaling, "
-        "load balancing, throughput, latency"
-    ),
-    "What happens when downstream services fail?": (
-        "downstream dependency failure handling, retries, circuit breakers, "
-        "fallback behavior, timeout handling"
-    ),
-    "How is data consistency maintained during concurrent updates?": (
-        "data consistency, concurrent writes, transactions, locking, "
-        "optimistic concurrency control, idempotency"
-    ),
-    "peak load without increasing latency": (
-        "horizontal autoscaling, HPA, queue depth, connection draining, "
-        "latency SLOs, throughput under peak traffic"
-    ),
-    "downstream services are unavailable": (
-        "downstream outage, circuit breaker, retries with backoff, "
-        "degraded mode, timeout budgets"
-    ),
-    "data kept consistent during concurrent updates": (
-        "transactions, optimistic locking, CRDTs, vector clocks, "
-        "read-your-writes, replica lag"
-    ),
-    "recover from infrastructure failure": (
-        "regional failover, control plane recovery, runbook automation, "
-        "disaster recovery, replica promotion"
-    ),
-    "repeated processing of the same request": (
-        "idempotency keys, deduplication, exactly-once semantics, "
-        "consumer offsets, poison message quarantine"
-    ),
-    "How are user requests protected from unauthorized access?": (
-        "authentication, authorization, tenant isolation, mutual TLS, "
-        "row-level security, access control boundaries"
-    ),
-}
+ensure_vertexai_stub_modules()
+from vertexai.language_models import GenerativeModel, GenerativeResponse  # noqa: E402
 
-
-class MockResponse:
-    def __init__(self, text: str) -> None:
-        self.text = text
-
-
-class MockGenerativeModel:
-    """Maps prompts to canned expansions; empty response falls back to original query."""
-
-    def __init__(self, expansions: dict[str, str] | None = None) -> None:
-        self._expansions = expansions or dict(MOCK_EXPANSIONS)
-
-    def generate_content(self, prompt: str) -> MockResponse:
-        for needle, expanded in self._expansions.items():
-            if needle in prompt:
-                return MockResponse(expanded)
-        m = re.search(r"User query:\s*(.+?)(?:\n|$)", prompt, flags=re.DOTALL)
-        if m:
-            q = m.group(1).strip()
-            if q in self._expansions:
-                return MockResponse(self._expansions[q])
-        return MockResponse("")
+# Back-compat for callers/tests expecting the old names.
+MockGenerativeModel = GenerativeModel
+MockResponse = GenerativeResponse
 
 
 class QueryExpander:

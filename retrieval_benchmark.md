@@ -51,6 +51,7 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
       },
       "strategy_b": {
         "expanded_query": "system scalability during peak traffic, high concurrency, autoscaling, load balancing, throughput, latency",
+        "expansion_changed": true,
         "top_results": [
           {
             "rank": 1,
@@ -86,8 +87,8 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
       },
       "comparison": {
         "overlap_count": 2,
-        "winner": "strategy_b",
-        "reason": "Top-1 chunk matches; compare deeper ranks and score deltas. Strategy B increased the top similarity - likely improved recall for this query."
+        "top1_score_delta_b_minus_a": 0.086391,
+        "notes": "Strategy A and Strategy B embed different query strings; rank-1 cosine values are not directly comparable as a quality score (higher B does not imply better retrieval). Top-1 chunk id matches; deeper ranks may still differ."
       }
     },
     {
@@ -129,6 +130,7 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
       },
       "strategy_b": {
         "expanded_query": "downstream dependency failure handling, retries, circuit breakers, fallback behavior, timeout handling",
+        "expansion_changed": true,
         "top_results": [
           {
             "rank": 1,
@@ -164,8 +166,8 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
       },
       "comparison": {
         "overlap_count": 3,
-        "winner": "strategy_b",
-        "reason": "Top-1 chunk matches; compare deeper ranks and score deltas. Strategy B increased the top similarity - likely improved recall for this query."
+        "top1_score_delta_b_minus_a": 0.035401,
+        "notes": "Strategy A and Strategy B embed different query strings; rank-1 cosine values are not directly comparable as a quality score (higher B does not imply better retrieval). Top-1 chunk id matches; deeper ranks may still differ."
       }
     },
     {
@@ -207,6 +209,7 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
       },
       "strategy_b": {
         "expanded_query": "authentication, authorization, tenant isolation, mutual TLS, row-level security, access control boundaries",
+        "expansion_changed": true,
         "top_results": [
           {
             "rank": 1,
@@ -242,8 +245,8 @@ Generated via ``python3 orchestrator.py --write-benchmark-md``. JSON snapshot (a
       },
       "comparison": {
         "overlap_count": 1,
-        "winner": "strategy_b",
-        "reason": "Top-1 chunk matches; compare deeper ranks and score deltas. Strategy B increased the top similarity - likely improved recall for this query."
+        "top1_score_delta_b_minus_a": 0.390618,
+        "notes": "Strategy A and Strategy B embed different query strings; rank-1 cosine values are not directly comparable as a quality score (higher B does not imply better retrieval). Top-1 chunk id matches; deeper ranks may still differ."
       }
     }
   ]

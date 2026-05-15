@@ -31,5 +31,9 @@ def test_benchmark_writes_json_and_md(tmp_path: Path) -> None:
     assert "strategy_a" in data[0]
     assert "comparison" in data[0]
     assert "overlap_count" in data[0]["comparison"]
+    assert "winner" not in data[0]["comparison"]
+    assert "top1_score_delta_b_minus_a" in data[0]["comparison"]
+    assert "expansion_changed" in data[0]["strategy_b"]
     body = md_out.read_text(encoding="utf-8")
     assert "Strategy A" in body and "Strategy B" in body
+    assert "Winner" not in body

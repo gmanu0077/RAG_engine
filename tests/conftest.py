@@ -1,21 +1,16 @@
-"""Minimal Vertex namespace so ``unittest.mock.patch(..., create=True)`` resolves."""
+"""Pytest hooks: Vertex stub modules for SDK-shaped imports."""
 
 from __future__ import annotations
 
-import sys
-import types
 from pathlib import Path
 
 import pytest
 
+from rag_engine.vertex_stubs import ensure_vertexai_stub_modules
+
 
 def pytest_configure(config: object) -> None:
-    if "vertexai" not in sys.modules:
-        vertexai = types.ModuleType("vertexai")
-        lm = types.ModuleType("vertexai.language_models")
-        vertexai.language_models = lm  # type: ignore[attr-defined]
-        sys.modules["vertexai"] = vertexai
-        sys.modules["vertexai.language_models"] = lm
+    ensure_vertexai_stub_modules()
 
 
 @pytest.fixture()

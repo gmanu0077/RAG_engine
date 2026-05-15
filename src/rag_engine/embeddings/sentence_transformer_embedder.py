@@ -15,6 +15,25 @@ class SentenceTransformerEmbedder(BaseEmbedder):
         self._model_name = model_name
         self._batch_size = batch_size
         self._normalize = normalize_embeddings
+        self._align_max_seq_length_with_transformer()
+
+    def _align_max_seq_length_with_transformer(self) -> None:
+        """Raise ST's truncation window when it is below the backbone's ``max_position_embeddings``.
+
+        ``sentence_transformers`` often ships ``all-MiniLM-L6-v2`` with ``max_seq_length=256`` for
+        speed, while the underlying BERT supports **512**. Our chunker targets ~350 tokens, so
+        leaving the cap at 256 spams tokenizer warnings and truncates chunks incorrectly.
+        """
+        try:
+            mod0 = self._model[0]
+            internal = getattr(mod0, "auto_model", None)
+            if internal is None:
+                return
+            mpe = getattr(getattr(internal, "config", None), "max_position_embeddings", None)
+            if isinstance(mpe, int) and mpe > 0 and self._model.max_seq_length < mpe:
+                self._model.max_seq_length = mpe
+        except Exception:
+            return
 
     @property
     def tokenizer(self):

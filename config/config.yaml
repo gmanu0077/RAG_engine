@@ -1,5 +1,5 @@
 # =============================================================================
-# Context-Aware Retrieval Engine — single source of truth (see plan.md)
+# Context-Aware Retrieval Engine — single source of truth (see context.md)
 # =============================================================================
 # All behavior is driven from this file. Prefer: FAISS + HNSW + cosine +
 # recursive token chunking + mock Vertex query expansion for the assessment.

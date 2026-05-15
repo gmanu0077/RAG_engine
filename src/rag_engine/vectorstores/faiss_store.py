@@ -180,6 +180,8 @@ class FaissVectorStore(BaseVectorStore):
             for c in self._chunks
         ]
         (p / "chunks.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+        meta = {"use_ip": self._use_ip}
+        (p / "store_meta.json").write_text(json.dumps(meta), encoding="utf-8")
 
     def load(self, path: str | Path) -> None:
         p = Path(path)
@@ -197,4 +199,9 @@ class FaissVectorStore(BaseVectorStore):
             for r in rows
         ]
         self._dim = self._index.d
-        self._use_ip = self._metric_inner_product()
+        meta_path = p / "store_meta.json"
+        if meta_path.is_file():
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            self._use_ip = bool(meta.get("use_ip", self._metric_inner_product()))
+        else:
+            self._use_ip = self._metric_inner_product()

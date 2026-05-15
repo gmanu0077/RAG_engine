@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from rag_engine.config.schema import EngineConfig
-from rag_engine.evaluation.metrics import overlap_count, pick_winner, summarize_strategy_shift
+from rag_engine.evaluation.metrics import overlap_count, summarize_strategy_shift, top1_score_delta_b_minus_a
 from rag_engine.retrieval.result_models import BenchmarkResult
 from rag_engine.retrieval.retriever import Retriever
 
@@ -60,7 +60,8 @@ def benchmark_results_to_jsonable(results: list[BenchmarkResult]) -> list[dict]:
     rows = []
     for br in results:
         ov = overlap_count(br.raw_results, br.expanded_results, top_n=3)
-        winner = pick_winner(br.raw_results, br.expanded_results)
+        delta = top1_score_delta_b_minus_a(br.raw_results, br.expanded_results)
+        expansion_changed = br.expanded_query.strip() != br.query.strip()
         rows.append(
             {
                 "query": br.query,
@@ -70,12 +71,13 @@ def benchmark_results_to_jsonable(results: list[BenchmarkResult]) -> list[dict]:
                 },
                 "strategy_b": {
                     "expanded_query": br.expanded_query,
+                    "expansion_changed": expansion_changed,
                     "top_results": [pack_hit(x) for x in br.expanded_results],
                 },
                 "comparison": {
                     "overlap_count": ov,
-                    "winner": winner,
-                    "reason": br.notes,
+                    "top1_score_delta_b_minus_a": None if delta is None else round(delta, 6),
+                    "notes": br.notes,
                 },
             },
         )
